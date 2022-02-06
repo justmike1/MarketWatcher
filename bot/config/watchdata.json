@@ -1,0 +1,38 @@
+{
+	"test": true,
+	"price_change_threshold": 0.01,
+	"price_change_interval": 5,
+	"reply_keyboard_telegram": [
+		[
+			"BTC",
+			"ETH"
+		],
+		[
+			"SAND",
+			"GALA"
+		],
+		[
+			"...",
+			"..."
+		]
+	],
+	"assets": [{
+			"name": "Bitcoin",
+			"ticker": "BTC",
+			"fetch_url": [{
+				"Binance": "https://api.binance.com/api/v3/ticker/price?symbol=BTCUSDT"
+			}],
+			"market_url": "https://www.binance.com/en/trade/BTC_USDT?layout=pro&type=spot",
+			"coingecko_url": "https://www.coingecko.com/en/coins/bitcoin"
+		},
+		{
+			"name": "Ethereum",
+			"ticker": "ETH",
+			"fetch_url": [{
+				"Binance": "https://api.binance.com/api/v3/ticker/price?symbol=ETHUSDT"
+			}],
+			"market_url": "https://www.binance.com/en/trade/ETH_USDT?layout=pro&type=spot",
+			"coingecko_url": "https://www.coingecko.com/en/coins/ethereum"
+		}
+	]
+}
