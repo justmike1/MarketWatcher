@@ -1,39 +1,38 @@
 import logging
+import requests
 import datetime
 from datetime import datetime, timedelta
-
-import requests
-import telegram
-from telegram import ReplyKeyboardMarkup, Update
-from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, JobQueue
 
 import sys
 import json
 
-with open(sys.argv[1], 'r') as f:
-    data = json.load(f)
+import telegram
+from telegram import ReplyKeyboardMarkup, Update
+from telegram.ext import Updater, CommandHandler, MessageHandler, Filters, JobQueue
+
 
 """
+price_change_interval was instructed to leave hardcoded
 self.tracking_users = Initialize database of users that track price changes
 self.price_change_interval = How long between checks for price change - in seconds
 self.price_change_threshold = How much % of asset's price should change before alerting
 """
 
+with open(sys.argv[1], 'r') as f:
+    data = json.load(f)
+
 
 class MarketWatcher:
     def __init__(self):
-        logging.basicConfig(level=logging.DEBUG,
+        logging.basicConfig(level=logging.INFO,
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
-
-        self.price_change_interval: int = (60 * int(data['price_change_interval']))
-        self.price_change_threshold = data['price_change_threshold']
+        self.price_change_interval: int = (60 * 5)
+        self.price_change_threshold = data["price_change_threshold"]
         self.assets = data['assets']
         self.reply_keyboard = data['reply_keyboard_telegram']
-
         self.assets_markup = ReplyKeyboardMarkup(self.reply_keyboard, one_time_keyboard=False)
-        self.production_token = config.marketwatcher_prod
-        self.test_token = config.marketwatcher_test
-
+        self.production_token = ''
+        self.test_token = ''
         self.tracking_users = {}
         self.price_fetcher_dict = {
             'Binance': lambda res_data: float(res_data['price']),
@@ -42,7 +41,7 @@ class MarketWatcher:
             'Kucoin': lambda res_data: float(res_data['data']['price']),
             'Ascendex': lambda res_data: float(res_data['data']['close']),
             'Hitbtc': lambda res_data: float(res_data['last']),
-            'Indodax': lambda res_data: round(float(res_data['ticker']['last'])),
+            'Indodax': lambda res_data: float(res_data['ticker']['last']),
             'Bittrex': lambda res_data: float(res_data['lastTradeRate']),
             'Bitfinex': lambda res_data: float(res_data[6]),
             'Liquid': lambda res_data: float(res_data['last_traded_price']),
@@ -50,19 +49,22 @@ class MarketWatcher:
             'Bitrue': lambda res_data: float(res_data['price']),
             'Bitmart': lambda res_data: float(res_data['data']['tickers'][0]['last_price']),
             'Digifinex': lambda res_data: float(res_data['ticker'][0]['last']),
-            'Huobi': lambda res_data: round(float(res_data['tick']['data'][0]['price'])),
+            'Huobi': lambda res_data: float(res_data['tick']['data'][0]['price']),
+            '2500/Asset': lambda res_data: round(float(2500 / (next(iter(res_data.values()))['usd'])), 4),
+            'idr_usd': lambda res_data: float(res_data['IDR_USD'])
         }
 
-        if conf.get('test'):
+        if data['test']:
             logging.info("Test bot has started".upper())
             self.updater = Updater(token=self.test_token, use_context=True)
         else:
             logging.info("Production bot has started".upper())
             self.updater = Updater(token=self.production_token, use_context=True)
+
         self.main()
 
     # Using free currency API
-    def get_converted_price(self, exchange, ticker, l_fetch):
+    def get_converted_price(self, exchange, ticker):
         try:
             for assets in self.assets:
                 if assets['ticker'] == ticker:
@@ -72,11 +74,9 @@ class MarketWatcher:
                         logging.error(res.status_code)
                         return -1
                     else:
-                        if l_fetch in self.price_fetcher_dict:
-                            return self.price_fetcher_dict[l_fetch](res.json())
+                        return self.price_fetcher_dict[exchange](res.json())
                 else:
-                    logging.error(f"couldn't get {asset} or {exchange} data")
-                    return
+                    continue
         except requests.exceptions.InvalidSchema as r_ex_in:
             logging.error(r_ex_in)
             return -1
@@ -88,12 +88,14 @@ class MarketWatcher:
                 logging.error(res.status_code)
                 return -1
             else:
-                exchange = exchange
                 if exchange in self.price_fetcher_dict:
+                    if 'solve_idr' in url:
+                        return round(self.price_fetcher_dict[exchange](res.json()) * self.get_converted_price('idr_usd', 'IDRUSD'), 5)
+                    elif 'qspbtc' in url:
+                        return round(self.price_fetcher_dict[exchange](res.json()) * self.get_converted_price('Binance', 'BTC'), 8)
                     return self.price_fetcher_dict[exchange](res.json())
                 else:
-                    logging.error(
-                        f"couldn't fetch {exchange}'s {url}, make sure the exchange's name written correctly in the config")
+                    logging.error(f"couldn't fetch {exchange}'s {url}, make sure the exchange's name written correctly in the config")
                     return
         except requests.exceptions.InvalidSchema as r_ex_in:
             logging.error(r_ex_in)
@@ -122,9 +124,7 @@ class MarketWatcher:
             return
         else:
             # Create new tracking user entity
-            self.tracking_users[update.effective_chat.id] = {
-                asset['ticker']: {'ticker': asset['ticker'], 'price': -1.0, 'timestamp': datetime.now()} for asset in
-                self.assets}
+            self.tracking_users[update.effective_chat.id] = { asset['ticker']: { 'ticker': asset['ticker'], 'price': -1.0, 'timestamp': datetime.now() } for asset in self.assets }
             # initialize asset list with prices = -1
             try:
                 # schedule the job to run once every set interval
@@ -139,7 +139,8 @@ class MarketWatcher:
                     f"tracking price changes.")
             except Exception as e:
                 context.bot.send_message(chat_id=update.effective_chat.id,
-                                         text='Error starting price change tracking.')
+                                         text='Error starting price change tracking.\n'
+                                              'Please check with @NameisMJ')
                 logging.error(
                     f"User @{update.message.from_user['username']}requested "
                     f"/start_track command - Exception encountered: {e}")
@@ -173,12 +174,12 @@ class MarketWatcher:
                     if datetime.now() - entry['timestamp'] >= timedelta(seconds=self.price_change_interval):
                         url_dict = asset['fetch_url'][0]
                         url = list(url_dict.values())[0]
-                        logging.info(url)  # TESTING
+                        logging.info(url)        # TESTING
                         exchange = list(url_dict.keys())[0]
-                        logging.info(exchange)  # TESTING
+                        logging.info(exchange)       # TESTING
                         new_price = self.get_asset_price(exchange, url)
                         if new_price == 0:
-                            logging.info(new_price)  # TESTING
+                            logging.info(new_price)     # TESTING
                             continue
                         # only calculate if there is a change
                         # calculate price change
@@ -192,16 +193,17 @@ class MarketWatcher:
                                                                                 f'currently <code>{new_price}</code> USDT '
                                                                                 f'.\nPlease '
                                                                                 f'update the new price.',
-                                                     parse_mode=telegram.ParseMode.HTML)
+                                                        parse_mode=telegram.ParseMode.HTML)
                             logging.info(f'Chat id {user.chat_id} received price change update on '
-                                         f'{asset["ticker"]} | Price: {new_price}, '
-                                         f'Change: {price_change:.0%}')
+                                            f'{asset["ticker"]} | Price: {new_price}, '
+                                            f'Change: {price_change:.0%}')
                     break
 
     def start(self, update: Update, context):
         reply_text = f'*Hi {update.message.from_user["first_name"]}\! Welcome to MarketWatcher bot\.*\n' \
                      'This bot will provide information on asset prices and market stats\.\n' \
-                     'To start, use command /start\_track and follow up with /track\_all\.'
+                     'To start, use command /start\_track and follow up with /track\_all\.\n' \
+                     'For help or feedback, contact @NameisMJ\.'
         context.bot.send_message(chat_id=update.effective_chat.id, text=reply_text,
                                  parse_mode=telegram.ParseMode.MARKDOWN_V2, reply_markup=self.assets_markup)
         logging.info(f"User @{update.message.from_user['username']}"
@@ -234,7 +236,7 @@ class MarketWatcher:
                                     f'@{update.message.from_user["username"]}')
                     if not fetched:
                         context.bot.send_message(chat_id=update.effective_chat.id,
-                                                 text=f'Error fetching {ticker}.')
+                                                 text=f'Error fetching {ticker}.\nPlease notify @NameisMJ')
                     else:
                         context.bot.send_message(chat_id=update.effective_chat.id, text=msg,
                                                  parse_mode=telegram.ParseMode.MARKDOWN_V2,
@@ -276,7 +278,7 @@ class MarketWatcher:
                                 f'@{update.message.from_user["username"]}')
                 if not fetched:
                     context.bot.send_message(chat_id=update.effective_chat.id,
-                                             text=f'Error fetching {requested_ticker}.')
+                                             text=f'Error fetching {requested_ticker}.\nPlease notify @NameisMJ')
                 else:
                     msg += f'*[Link to market]({asset["market_url"]})*\n'
                     msg += f'*[Link to coingecko]({asset["coingecko_url"]})*'
@@ -317,4 +319,4 @@ class MarketWatcher:
 
 
 if __name__ == '__main__':
-    MarketWatcher()
+    MarketWatcher().main()
