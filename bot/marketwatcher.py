@@ -183,7 +183,7 @@ class MarketWatcher:
                                 url = list(url_dict.values())[0]
                                 exchange = list(url_dict.keys())[0]
                                 new_price = self.get_asset_price(exchange, url)
-                                if new_price == 0:
+                                if new_price == -1:
                                     continue
                                 # only calculate if there is a change
                                 # calculate price change
