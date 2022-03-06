@@ -1,0 +1,4 @@
+config==0.5.1
+requests==2.22.0
+strategies==0.2.3
+telegram==0.0.1
