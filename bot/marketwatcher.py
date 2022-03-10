@@ -217,9 +217,8 @@ class MarketWatcher:
                      f"requested /start command. Message sent.")
 
     def track_all(self, update: Update, context):
-        supported_tickers = []
-        for asset in self.assets:
-            supported_tickers.append(asset['ticker'])
+        # must use 3 rows in self.reply_keyboard
+        supported_tickers = self.reply_keyboard[0] + self.reply_keyboard[1] + self.reply_keyboard[2]
         for ticker in supported_tickers:
             for asset in self.assets:
                 if ticker == asset['ticker']:
