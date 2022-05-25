@@ -25,28 +25,30 @@ class MarketWatcher:
     def __init__(self):
         logging.basicConfig(level=logging.INFO,
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+
         self.price_change_interval: int = (60 * 5)
         self.price_change_threshold = data['price_change_threshold']
+
         self.assets = data['assets']
         self.reply_keyboard = data['reply_keyboard_telegram']
         self.assets_markup = ReplyKeyboardMarkup(self.reply_keyboard, one_time_keyboard=False)
+
         self.production_token = ''
         self.test_token = ''
+        
         self.tracking_users = {}
-        self.chat_id = []
+
         self.price_fetcher_dict = {
-            'Binance': lambda res_data: float(res_data['price']),
-            'Coinbase': lambda res_data: float(res_data['price']),
+            'Coinbase' or 'Binance' or 'Bitrue': lambda res_data: float(res_data['price']),
             'Gateio': lambda res_data: float(res_data[0]['last']),
             'Kucoin': lambda res_data: float(res_data['data']['price']),
             'Ascendex': lambda res_data: float(res_data['data']['close']),
-            'Hitbtc': lambda res_data: float(res_data['last']),
+            'Hitbtc' or 'Coincheck': lambda res_data: float(res_data['last']),
             'Indodax': lambda res_data: float(res_data['ticker']['last']),
             'Bittrex': lambda res_data: float(res_data['lastTradeRate']),
             'Bitfinex': lambda res_data: float(res_data[6]),
             'Liquid': lambda res_data: float(res_data['last_traded_price']),
-            'Mexc': lambda res_data: float(res_data['data'][0]['last']),
-            'Bitrue': lambda res_data: float(res_data['price']),
+            'Okex' or 'Mexc': lambda res_data: float(res_data['data'][0]['last']),
             'Bitmart': lambda res_data: float(res_data['data']['tickers'][0]['last_price']),
             'Digifinex': lambda res_data: float(res_data['ticker'][0]['last']),
             'Huobi': lambda res_data: float(res_data['tick']['data'][0]['price']),
@@ -64,6 +66,7 @@ class MarketWatcher:
         self.main()
 
     # Using free currency API
+# Using free currency API for IDR & binance for BTC quotes
     def get_converted_price(self, exchange, ticker):
         try:
             for assets in self.assets:
@@ -147,8 +150,7 @@ class MarketWatcher:
                     f"tracking price changes.")
             except Exception as e:
                 context.bot.send_message(chat_id=update.effective_chat.id,
-                                         text='Error starting price change tracking.\n'
-                                              'Please check with @NameisMJ')
+                                         text='Error starting price change tracking.')
                 logging.error(
                     f"User @{update.message.from_user['username']} requested "
                     f"/start_track command - Exception encountered: {e}")
@@ -190,7 +192,7 @@ class MarketWatcher:
                                 price_change = (new_price - entry['price']) / entry['price']
                                 if abs(price_change) >= self.price_change_threshold:
                                     # Update in local tracking users with current timestamp
-                                    for _id in self.chat_id:
+                                    for _id in self.tracking_users.keys():
                                         self.update_asset_price(_id, entry['ticker'], new_price)
                                         context.bot.send_message(chat_id=_id,
                                                                  text=f'<b>{asset["ticker"]}</b> '
@@ -208,17 +210,14 @@ class MarketWatcher:
     def start(self, update: Update, context):
         reply_text = f'*Hi {update.message.from_user["first_name"]}\! Welcome to MarketWatcher bot\.*\n' \
                      'This bot will provide information on asset prices and market stats\.\n' \
-                     'To start, use command /start\_track and follow up with /track\_all\.\n' \
-                     'For help or feedback, contact @NameisMJ\.'
-        self.chat_id.append(str(update.effective_chat.id))
+                     'To start, use command /start\_track and follow up with /track\_all\.'
         context.bot.send_message(chat_id=update.effective_chat.id, text=reply_text,
                                  parse_mode=telegram.ParseMode.MARKDOWN_V2, reply_markup=self.assets_markup)
         logging.info(f"User @{update.message.from_user['username']} "
                      f"requested /start command. Message sent.")
 
     def track_all(self, update: Update, context):
-        # must use 3 rows in self.reply_keyboard
-        supported_tickers = self.reply_keyboard[0] + self.reply_keyboard[1] + self.reply_keyboard[2]
+        supported_tickers = [asset for line in self.reply_keyboard for asset in line]
         for ticker in supported_tickers:
             for asset in self.assets:
                 if ticker == asset['ticker']:
@@ -242,7 +241,7 @@ class MarketWatcher:
                                     f'@{update.message.from_user["username"]}')
                     if not fetched:
                         context.bot.send_message(chat_id=update.effective_chat.id,
-                                                 text=f'Error fetching {ticker}.\nPlease notify @NameisMJ')
+                                                 text=f'Error fetching {ticker}.')
                     else:
                         context.bot.send_message(chat_id=update.effective_chat.id, text=msg,
                                                  parse_mode=telegram.ParseMode.MARKDOWN_V2,
@@ -284,7 +283,7 @@ class MarketWatcher:
                                 f'@{update.message.from_user["username"]}')
                 if not fetched:
                     context.bot.send_message(chat_id=update.effective_chat.id,
-                                             text=f'Error fetching {requested_ticker}.\nPlease notify @NameisMJ')
+                                             text=f'Error fetching {requested_ticker}.')
                 else:
                     msg += f'*[Link to market]({asset["market_url"]})*\n'
                     msg += f'*[Link to coingecko]({asset["coingecko_url"]})*'
@@ -321,8 +320,7 @@ class MarketWatcher:
         dispatcher.add_handler(MessageHandler(Filters.command, self.unknown))
 
         self.updater.start_polling()
-        self.updater.idle()
 
 
 if __name__ == '__main__':
-    MarketWatcher().main()
+    MarketWatcher()
