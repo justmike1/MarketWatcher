@@ -3,6 +3,7 @@ import requests
 import datetime
 from datetime import datetime, timedelta
 
+import os
 import sys
 import json
 
@@ -20,6 +21,27 @@ self.price_change_threshold = How much % of asset's price should change before a
 with open(sys.argv[1], 'r') as f:
     data = json.load(f)
 
+price_fetcher_dict = {
+    'Coinbase': lambda res_data: float(res_data['price']),
+    'Binance': lambda res_data: float(res_data['price']),
+    'Bitrue': lambda res_data: float(res_data['price']),
+    'Gateio': lambda res_data: float(res_data[0]['last']),
+    'Kucoin': lambda res_data: float(res_data['data']['price']),
+    'Ascendex': lambda res_data: float(res_data['data']['close']),
+    'Hitbtc': lambda res_data: float(res_data['last']),
+    'Coincheck': lambda res_data: float(res_data['last']),
+    'Indodax': lambda res_data: float(res_data['ticker']['last']),
+    'Bittrex': lambda res_data: float(res_data['lastTradeRate']),
+    'Bitfinex': lambda res_data: float(res_data[6]),
+    'Liquid': lambda res_data: float(res_data['last_traded_price']),
+    'Okex': lambda res_data: float(res_data['data'][0]['last']),
+    'Mexc': lambda res_data: float(res_data['data'][0]['last']),
+    'Bitmart': lambda res_data: float(res_data['data']['tickers'][0]['last_price']),
+    'Digifinex': lambda res_data: float(res_data['ticker'][0]['last']),
+    'Huobi': lambda res_data: float(res_data['tick']['data'][0]['price']),
+    '2500/Asset': lambda res_data: round(float(2500 / (next(iter(res_data.values()))['usd'])), 4),
+    'idr_usd': lambda res_data: float(res_data['IDR_USD'])
+}
 
 class MarketWatcher:
     def __init__(self):
@@ -33,28 +55,10 @@ class MarketWatcher:
         self.reply_keyboard = data['reply_keyboard_telegram']
         self.assets_markup = ReplyKeyboardMarkup(self.reply_keyboard, one_time_keyboard=False)
 
-        self.production_token = ''
-        self.test_token = ''
+        self.production_token = os.getenv('production_token')
+        self.test_token = os.getenv('test_token')
         
         self.tracking_users = {}
-
-        self.price_fetcher_dict = {
-            'Coinbase' or 'Binance' or 'Bitrue': lambda res_data: float(res_data['price']),
-            'Gateio': lambda res_data: float(res_data[0]['last']),
-            'Kucoin': lambda res_data: float(res_data['data']['price']),
-            'Ascendex': lambda res_data: float(res_data['data']['close']),
-            'Hitbtc' or 'Coincheck': lambda res_data: float(res_data['last']),
-            'Indodax': lambda res_data: float(res_data['ticker']['last']),
-            'Bittrex': lambda res_data: float(res_data['lastTradeRate']),
-            'Bitfinex': lambda res_data: float(res_data[6]),
-            'Liquid': lambda res_data: float(res_data['last_traded_price']),
-            'Okex' or 'Mexc': lambda res_data: float(res_data['data'][0]['last']),
-            'Bitmart': lambda res_data: float(res_data['data']['tickers'][0]['last_price']),
-            'Digifinex': lambda res_data: float(res_data['ticker'][0]['last']),
-            'Huobi': lambda res_data: float(res_data['tick']['data'][0]['price']),
-            '2500/Asset': lambda res_data: round(float(2500 / (next(iter(res_data.values()))['usd'])), 4),
-            'idr_usd': lambda res_data: float(res_data['IDR_USD'])
-        }
 
         if data['test']:
             logging.info("Test bot has started".upper())
@@ -77,7 +81,7 @@ class MarketWatcher:
                         logging.error(res.status_code)
                         return -1
                     else:
-                        return self.price_fetcher_dict[exchange](res.json())
+                        return price_fetcher_dict[exchange](res.json())
                 else:
                     continue
         except requests.exceptions.InvalidSchema as r_ex_in:
@@ -91,16 +95,16 @@ class MarketWatcher:
                 logging.error(res.status_code)
                 return -1
             else:
-                if exchange in self.price_fetcher_dict:
+                if exchange in price_fetcher_dict:
                     if 'solve_idr' in url:
-                        return round(self.price_fetcher_dict[exchange](res.json()) * self.get_converted_price('idr_usd',
+                        return round(price_fetcher_dict[exchange](res.json()) * self.get_converted_price('idr_usd',
                                                                                                               'IDRUSD'),
                                      5)
                     elif 'qspbtc' in url:
                         return round(
-                            self.price_fetcher_dict[exchange](res.json()) * self.get_converted_price('Binance', 'BTC'),
+                            price_fetcher_dict[exchange](res.json()) * self.get_converted_price('Binance', 'BTC'),
                             8)
-                    return self.price_fetcher_dict[exchange](res.json())
+                    return price_fetcher_dict[exchange](res.json())
                 else:
                     logging.error(
                         f"couldn't fetch {exchange}'s {url}, make sure the exchange's name written correctly in the config")
