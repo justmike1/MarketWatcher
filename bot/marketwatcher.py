@@ -18,9 +18,6 @@ self.price_change_interval = How long between checks for price change - in secon
 self.price_change_threshold = How much % of asset's price should change before alerting
 """
 
-with open(sys.argv[1], 'r') as f:
-    data = json.load(f)
-
 price_fetcher_dict = {
     'Coinbase': lambda res_data: float(res_data['price']),
     'Binance': lambda res_data: float(res_data['price']),
@@ -44,6 +41,10 @@ price_fetcher_dict = {
 }
 
 class MarketWatcher:
+
+    with open(sys.argv[1], 'r') as f:
+        data = json.load(f)
+
     def __init__(self):
         logging.basicConfig(level=logging.INFO,
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
