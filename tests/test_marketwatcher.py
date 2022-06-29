@@ -1,5 +1,6 @@
 import pytest
 import requests as r
+
 from bot.marketwatcher import price_fetcher_dict
 
 fetch_urls = {

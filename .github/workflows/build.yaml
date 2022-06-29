@@ -6,17 +6,19 @@ on:
     branches:
       - main
 name: "Run CI"
-concurrency: 
-  group: 'ci-${{ github.ref }}'
+concurrency:
+  group: "ci-${{ github.ref }}"
   cancel-in-progress: true
 jobs:
   unit-tests:
-    name: "Run unit tests"
+    name: "Lint & Run unit tests"
     runs-on: ubuntu-20.04
     timeout-minutes: 10
     steps:
       - uses: actions/checkout@v3
       - name: Install dependecies
         run: pip install -r requirements.txt
+      - name: Lint all
+        run: ./scripts/lint_all.sh
       - name: Run pytest
         run: pytest -v tests/ -W ignore::DeprecationWarning
