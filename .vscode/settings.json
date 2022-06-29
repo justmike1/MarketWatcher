@@ -1,5 +1,0 @@
-{
-    "yaml.schemas": {
-        "https://json.schemastore.org/github-workflow.json": "file:///Users/mike/devops/MarketWatcher/.github/workflows/build.yaml"
-    }
-}
