@@ -5,20 +5,13 @@ output-format=colorized
 
 disable=
     # bad rules:
+    anomalous-backslash-in-string,
     missing-module-docstring,
     missing-function-docstring,
     missing-class-docstring,
-    too-many-arguments,
     too-many-instance-attributes,
-    too-few-public-methods,
     logging-fstring-interpolation,
     line-too-long,
-    duplicate-code,
-    too-many-locals,
-    too-many-return-statements,
-
-    #TODO: configure
+    too-many-nested-blocks,
     invalid-name,
-
-
 evaluation=0 if (error + warning + refactor + convention) else 10

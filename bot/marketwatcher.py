@@ -11,13 +11,6 @@ from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import (CommandHandler, Filters, JobQueue, MessageHandler,
                           Updater)
 
-"""
-price_change_interval was instructed to leave hardcoded
-self.tracking_users = Initialize database of users that track price changes
-self.price_change_interval = How long between checks for price change - in seconds
-self.price_change_threshold = How much % of asset's price should change before alerting
-"""
-
 price_fetcher_dict = {
     "Coinbase": lambda res_data: float(res_data["price"]),
     "Binance": lambda res_data: float(res_data["price"]),
@@ -45,8 +38,14 @@ price_fetcher_dict = {
 
 class MarketWatcher:
     def __init__(self):
+        """
+        price_change_interval was instructed to leave hardcoded
+        self.tracking_users = Initialize database of users that track price changes
+        self.price_change_interval = How long between checks for price change - in seconds
+        self.price_change_threshold = How much % of asset's price should change before alerting
+        """
 
-        with open(sys.argv[1], "r") as f:
+        with open(sys.argv[1], mode="r", encoding="UTF-8") as f:
             data = json.load(f)
 
         logging.basicConfig(
@@ -77,8 +76,8 @@ class MarketWatcher:
 
         self.main()
 
-    # Using free currency API
     # Using free currency API for IDR & binance for BTC quotes
+    # pylint: disable=inconsistent-return-statements
     def get_converted_price(self, exchange, ticker):
         try:
             for assets in self.assets:
@@ -88,40 +87,37 @@ class MarketWatcher:
                     if res.status_code != 200:
                         logging.error(res.status_code)
                         return -1
-                    else:
-                        return price_fetcher_dict[exchange](res.json())
-                else:
-                    continue
+                    return price_fetcher_dict[exchange](res.json())
+                continue
         except requests.exceptions.InvalidSchema as r_ex_in:
             logging.error(r_ex_in)
             return -1
 
+    # pylint: disable=inconsistent-return-statements
     def get_asset_price(self, exchange, url):
         try:
             res = requests.get(url)
             if res.status_code != 200:
                 logging.error(res.status_code)
                 return -1
-            else:
-                if exchange in price_fetcher_dict:
-                    if "solve_idr" in url:
-                        return round(
-                            price_fetcher_dict[exchange](res.json())
-                            * self.get_converted_price("idr_usd", "IDRUSD"),
-                            5,
-                        )
-                    elif "qspbtc" in url:
-                        return round(
-                            price_fetcher_dict[exchange](res.json())
-                            * self.get_converted_price("Binance", "BTC"),
-                            8,
-                        )
-                    return price_fetcher_dict[exchange](res.json())
-                else:
-                    logging.error(
-                        f"couldn't fetch {exchange}'s {url}, make sure the exchange's name written correctly in the config"
+            if exchange in price_fetcher_dict:
+                if "solve_idr" in url:
+                    return round(
+                        price_fetcher_dict[exchange](res.json())
+                        * self.get_converted_price("idr_usd", "IDRUSD"),
+                        5,
                     )
-                    return
+                if "qspbtc" in url:
+                    return round(
+                        price_fetcher_dict[exchange](res.json())
+                        * self.get_converted_price("Binance", "BTC"),
+                        8,
+                    )
+                return price_fetcher_dict[exchange](res.json())
+            logging.error(
+                f"couldn't fetch {exchange}'s {url}, make sure the exchange's name written correctly in the config"
+            )
+            return
         except requests.exceptions.InvalidSchema as r_ex_in:
             logging.error(r_ex_in)
             return -1
@@ -143,61 +139,55 @@ class MarketWatcher:
         if self.is_user_tracking_changes(update.effective_chat.id):
             context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=f"You are already tracking price changes.\nTo stop, use /stop_track command.",
+                text="You are already tracking price changes.\nTo stop, use /stop_track command.",
             )
             logging.info(
-                f"User @{update.message.from_user['username']} "
-                f"already tracking price changes."
+                f"User @{update.message.from_user['username']} already tracking price changes."
             )
             return
-        else:
-            # Create new tracking user entity
-            self.tracking_users[update.effective_chat.id] = {
-                asset["ticker"]: {
-                    "ticker": asset["ticker"],
-                    "price": -1.0,
-                    "timestamp": datetime.now(),
-                }
-                for asset in self.assets
+        # Create new tracking user entity
+        self.tracking_users[update.effective_chat.id] = {
+            asset["ticker"]: {
+                "ticker": asset["ticker"],
+                "price": -1.0,
+                "timestamp": datetime.now(),
             }
-            # initialize asset list with prices = -1
-            try:
-                # schedule the job to run once every set interval
-                context.job_queue.run_repeating(
-                    callback=self.track_price_change,
-                    interval=self.price_change_interval,
-                    context=context,
-                )
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text=f"Starting price change tracker.\n"
-                    f"Please follow up with /track_all command"
-                    f"\nTo stop, use /stop_track command.",
-                )
-                logging.info(
-                    f"User @{update.message.from_user['username']} started "
-                    f"tracking price changes."
-                )
-            except Exception as e:
-                context.bot.send_message(
-                    chat_id=update.effective_chat.id,
-                    text="Error starting price change tracking.",
-                )
-                logging.error(
-                    f"User @{update.message.from_user['username']} requested "
-                    f"/start_track command - Exception encountered: {e}"
-                )
+            for asset in self.assets
+        }
+        # initialize asset list with prices = -1
+        try:
+            # schedule the job to run once every set interval
+            context.job_queue.run_repeating(
+                callback=self.track_price_change,
+                interval=self.price_change_interval,
+                context=context,
+            )
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Starting price change tracker.\nPlease follow up with /track_all command\nTo stop, use /stop_track command.",
+            )
+            logging.info(
+                f"User @{update.message.from_user['username']} started tracking price changes."
+            )
+        # pylint: disable=broad-except
+        except Exception as e:
+            context.bot.send_message(
+                chat_id=update.effective_chat.id,
+                text="Error starting price change tracking.",
+            )
+            logging.error(
+                f"User @{update.message.from_user['username']} requested "
+                f"/start_track command - Exception encountered: {e}"
+            )
 
     def stop_track(self, update: Update, context):
         if not self.is_user_tracking_changes(update.effective_chat.id):
             context.bot.send_message(
                 chat_id=update.effective_chat.id,
-                text=f"You are not currently tracking price changes."
-                f"\nTo start, use /start_track",
+                text="You are not currently tracking price changes.\nTo start, use /start_track",
             )
             logging.warning(
-                f"User @{update.message.from_user['username']} "
-                f"requested /stop_track but is not in list of IDs tracking changes"
+                f"User @{update.message.from_user['username']} requested /stop_track but is not in list of IDs tracking changes"
             )
         else:
             _id = update.effective_chat.id
@@ -208,8 +198,7 @@ class MarketWatcher:
                 chat_id=update.effective_chat.id, text="Stopped price change tracker."
             )
             logging.info(
-                f"User @{update.message.from_user['username']} removed "
-                f"from list of IDs tracking price change"
+                f"User @{update.message.from_user['username']} removed from list of IDs tracking price change"
             )
 
     def track_price_change(self, context):
@@ -236,24 +225,17 @@ class MarketWatcher:
                                 ]
                                 if abs(price_change) >= self.price_change_threshold:
                                     # Update in local tracking users with current timestamp
-                                    for _id in self.tracking_users.keys():
+                                    for _id in self.tracking_users:
                                         self.update_asset_price(
                                             _id, entry["ticker"], new_price
                                         )
                                         context.bot.send_message(
                                             chat_id=_id,
-                                            text=f'<b>{asset["ticker"]}</b> '
-                                            f"price changed by "
-                                            f"<b>{price_change:.0%}</b> - "
-                                            f"currently <code>{new_price}</code> USDT "
-                                            f".\nPlease "
-                                            f"update the new price.",
+                                            text=f"<b>{asset['ticker']}</b> price changed by <b>{price_change:.0%}</b> - currently <code>{new_price}</code> USDT.\nPlease update the new price.",
                                             parse_mode=telegram.ParseMode.HTML,
                                         )
                                         logging.info(
-                                            f"Chat id {_id} received price change update on "
-                                            f'{asset["ticker"]} | Price: {new_price}, '
-                                            f"Change: {price_change:.0%}"
+                                            f"Chat id {_id} received price change update on {asset['ticker']} | Price: {new_price}, Change: {price_change:.0%}"
                                         )
                             break
 
@@ -270,8 +252,7 @@ class MarketWatcher:
             reply_markup=self.assets_markup,
         )
         logging.info(
-            f"User @{update.message.from_user['username']} "
-            f"requested /start command. Message sent."
+            f"User @{update.message.from_user['username']} requested /start command. Message sent."
         )
 
     def track_all(self, update: Update, context):
@@ -297,8 +278,7 @@ class MarketWatcher:
                                     updated = True
                             else:
                                 logging.error(
-                                    f"Error fetching price for {ticker} from {exchange} requested by "
-                                    f'@{update.message.from_user["username"]}'
+                                    f"Error fetching price for {ticker} from {exchange} requested by @{update.message.from_user['username']}"
                                 )
                     if not fetched:
                         context.bot.send_message(
@@ -314,8 +294,7 @@ class MarketWatcher:
                             reply_markup=self.assets_markup,
                         )
                         logging.info(
-                            f'User @{update.message.from_user["username"]} '
-                            f"requested ticker {ticker}"
+                            f"User @{update.message.from_user['username']} requested ticker {ticker}"
                         )
 
     def unknown(self, update: Update, context):
@@ -324,8 +303,7 @@ class MarketWatcher:
             text="command is invalid\n" "Type '/' to see all available commands.",
         )
         logging.warning(
-            f"User @{update.message.from_user['username']} requested unknown "
-            f"command {update.message.text}. Message sent."
+            f"User @{update.message.from_user['username']} requested unknown command {update.message.text}. Message sent."
         )
 
     def asset_info(self, update: Update, context):
@@ -351,8 +329,7 @@ class MarketWatcher:
                                 updated = True
                         else:
                             logging.error(
-                                f"Error fetching price for {requested_ticker} from {exchange} requested by "
-                                f'@{update.message.from_user["username"]}'
+                                f"Error fetching price for {requested_ticker} from {exchange} requested by @{update.message.from_user['username']}"
                             )
                 if not fetched:
                     context.bot.send_message(
@@ -370,8 +347,7 @@ class MarketWatcher:
                         reply_markup=self.assets_markup,
                     )
                     logging.info(
-                        f'User @{update.message.from_user["username"]} '
-                        f"requested ticker {requested_ticker}"
+                        f"User @{update.message.from_user['username']} requested ticker {requested_ticker}"
                     )
 
                 return
@@ -382,8 +358,7 @@ class MarketWatcher:
             reply_markup=self.assets_markup,
         )
         logging.warning(
-            f'User @{update.message.from_user["username"]} '
-            f"requested ticker {requested_ticker} | Not found in asset list. Message sent."
+            f"User @{update.message.from_user['username']} requested ticker {requested_ticker} | Not found in asset list. Message sent."
         )
 
     def main(self):
