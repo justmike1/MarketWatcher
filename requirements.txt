@@ -1,4 +1,4 @@
-config==0.5.1
-requests==2.22.0
-strategies==0.2.3
+requests==2.27.1
 telegram==0.0.1
+python-telegram-bot==13.13
+pytest==7.1.2
