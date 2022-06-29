@@ -10,7 +10,8 @@ concurrency:
   group: 'ci-${{ github.ref }}'
   cancel-in-progress: true
 jobs:
-  run-unit-tests:
+  unit-tests:
+    name: "Run unit tests"
     runs-on: ubuntu-20.04
     timeout-minutes: 10
     steps:
