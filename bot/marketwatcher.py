@@ -41,11 +41,11 @@ price_fetcher_dict = {
 }
 
 class MarketWatcher:
-
-    with open(sys.argv[1], 'r') as f:
-        data = json.load(f)
-
     def __init__(self):
+
+        with open(sys.argv[1], 'r') as f:
+            data = json.load(f)
+
         logging.basicConfig(level=logging.INFO,
                             format='%(asctime)s - %(name)s - %(levelname)s - %(message)s')
 
