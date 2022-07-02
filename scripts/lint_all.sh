@@ -8,7 +8,7 @@ success=0
 
 ./"$scripts_folder"/format_all.sh -c
 
-echo -n "Running pylint..."
+printf "\nRunning pylint..."
 pylint "$root_folder/bot/marketwatcher.py" --rcfile="$root_folder"/.pylintrc
 if [ $? -ne 0 ]; then
 	success=1

@@ -5,7 +5,6 @@ This bot is an always-on service, ideally deployed in the cloud. It can fetch pr
 ## Installation
 
 ```bash
-brew install shfmt shellcheck
 pip3 install -r requirements.txt
 ```
 

@@ -53,6 +53,15 @@ class MarketWatcher:
             format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
         )
 
+        self.session = requests.Session()
+
+        self._proxy = data["proxy", False]
+        if self._proxy:
+            self.proxies = {
+                "http": "http://" + self._proxy,
+                "https": "http://" + self._proxy,
+            }
+
         self.price_change_interval: int = 60 * 5
         self.price_change_threshold = data["price_change_threshold"]
 
@@ -83,7 +92,9 @@ class MarketWatcher:
             for assets in self.assets:
                 if assets["ticker"] == ticker:
                     url = assets["fetch_url"][0][exchange]
-                    res = requests.get(url)
+                    res = self.session.get(
+                        url=url, proxies=self.proxies if self._proxy else None
+                    )
                     if res.status_code != 200:
                         logging.error(res.status_code)
                         return -1
@@ -96,7 +107,9 @@ class MarketWatcher:
     # pylint: disable=inconsistent-return-statements
     def get_asset_price(self, exchange, url):
         try:
-            res = requests.get(url)
+            res = self.session.get(
+                url=url, proxies=self.proxies if self._proxy else None
+            )
             if res.status_code != 200:
                 logging.error(res.status_code)
                 return -1
