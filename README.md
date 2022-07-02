@@ -2,7 +2,7 @@
 
 This bot is an always-on service, ideally deployed in the cloud. It can fetch price data for crypto assets and track price changes.
 
-## Installation
+## Install dependencies
 
 ```bash
 pip3 install -r requirements.txt
@@ -11,6 +11,7 @@ pip3 install -r requirements.txt
 ## Running the bot
 
 ```bash
+echo -e "production_token='<YOURTOKEN>'\ntest_token='<YOURTOKEN>'" > bot/.env
 python3 bot/marketwatcher.py bot/config/watchdata.json
 ```
 
