@@ -11,6 +11,10 @@ from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import (CommandHandler, Filters, JobQueue, MessageHandler,
                           Updater)
 
+from dotenv import load_dotenv
+load_dotenv()
+
+
 price_fetcher_dict = {
     "Coinbase": lambda res_data: float(res_data["price"]),
     "Binance": lambda res_data: float(res_data["price"]),
@@ -55,7 +59,7 @@ class MarketWatcher:
 
         self.session = requests.Session()
 
-        self._proxy = data["proxy", False]
+        self._proxy = data["proxy"]
         if self._proxy:
             self.proxies = {
                 "http": "http://" + self._proxy,

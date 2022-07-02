@@ -1,6 +1,5 @@
 # Byte-compiled / optimized / DLL files
 __pycache__/
-bot/config/watchdata.json
 
 # Installer logs
 pip-log.txt

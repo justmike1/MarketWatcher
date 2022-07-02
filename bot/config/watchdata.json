@@ -1,5 +1,6 @@
 {
   "test": true,
+  "proxy": false,
   "price_change_threshold": 0.01,
   "price_change_interval": 5,
   "reply_keyboard_telegram": [
