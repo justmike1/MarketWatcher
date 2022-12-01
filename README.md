@@ -13,7 +13,9 @@ pip3 install -r requirements.txt
 ```bash
 echo -e "production_token='<YOURTOKEN>'\ntest_token='<YOURTOKEN>'" > bot/.env
 ```
+
 **default values already in bot/config/watchdata.json, modify to your use**
+
 ```bash
 vi bot/config/watchdata.json
 ```

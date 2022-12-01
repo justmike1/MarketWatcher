@@ -7,11 +7,11 @@ from datetime import datetime, timedelta
 
 import requests
 import telegram
+from dotenv import load_dotenv
 from telegram import ReplyKeyboardMarkup, Update
 from telegram.ext import (CommandHandler, Filters, JobQueue, MessageHandler,
                           Updater)
 
-from dotenv import load_dotenv
 load_dotenv()
 
 
